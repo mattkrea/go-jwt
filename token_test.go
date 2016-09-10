@@ -44,6 +44,15 @@ func TestString(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(output, "."))
 }
 
+func TestParse(t *testing.T) {
+	token := New(DefaultConfig())
+	token.Set("name", "Test")
+	output, _ := token.String(nil)
+	result, err := Parse(output, nil)
+	assert.Equal(t, "Test", result.Payload["name"], "should still contain input props")
+	assert.Equal(t, nil, err, "should properly decode token")
+}
+
 func TestSignedString(t *testing.T) {
 
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)

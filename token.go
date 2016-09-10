@@ -7,7 +7,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -30,7 +32,7 @@ func (t *Token) String(key *rsa.PrivateKey) (string, error) {
 
 	headers := map[string]string{
 		"typ": "jwt",
-		// Default to no algorithm
+		// Default to no algorithm (i.e. no signature)
 		"alg": "none",
 	}
 
@@ -101,6 +103,54 @@ func (t *Token) String(key *rsa.PrivateKey) (string, error) {
 	}
 
 	return fmt.Sprintf("%s.%s.%s", headerEncoded, claimsEncoded, signature), nil
+}
+
+// Parse will take a JWT is string format and return the claims
+// and token configuration while automatically processing any claims
+// that are found on the token (e.g. `exp`, `nbf`)
+func Parse(token string, key *rsa.PublicKey) (*Token, error) {
+	if strings.Count(token, ".") != 2 {
+		return nil, errors.New("malformed token")
+	}
+
+	parts := strings.Split(token, ".")
+
+	if key != nil {
+		inputBytes := []byte(fmt.Sprintf("%s.%s", parts[0], parts[1]))
+		hash := sha256.New()
+		hash.Write(inputBytes)
+		inputHash := hash.Sum(nil)
+
+		err := rsa.VerifyPKCS1v15(key, crypto.SHA256, inputHash, []byte(parts[2]))
+		if err != nil {
+			return nil, errors.New("token signature verification failed")
+		}
+	}
+
+	headerBytes, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, err
+	}
+
+	claimsBytes, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, err
+	}
+
+	var headers map[string]interface{}
+	var claims map[string]interface{}
+
+	err = json.Unmarshal(headerBytes, &headers)
+	if err != nil {
+		return nil, errors.New("token contains invalid JSON")
+	}
+
+	err = json.Unmarshal(claimsBytes, &claims)
+	if err != nil {
+		return nil, errors.New("token contains invalid JSON")
+	}
+
+	return &Token{Payload: claims["payload"].(map[string]interface{})}, nil
 }
 
 type TokenConfig struct {
