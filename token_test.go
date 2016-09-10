@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -40,4 +42,16 @@ func TestString(t *testing.T) {
 	output, err := token.String(nil)
 	assert.Equal(t, nil, err, "should properly encode token")
 	assert.Equal(t, 2, strings.Count(output, "."))
+}
+
+func TestSignedString(t *testing.T) {
+
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+	token := New(DefaultConfig())
+	token.Set("name", "Test")
+	output, err := token.String(key)
+	assert.Equal(t, nil, err, "should properly encode token")
+	assert.Equal(t, 2, strings.Count(output, "."))
+	assert.NotEqual(t, ".", output[len(output)-1:], "should add signature after final period")
 }

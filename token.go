@@ -1,7 +1,10 @@
 package jwt
 
 import (
+	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -69,19 +72,35 @@ func (t *Token) String(key *rsa.PrivateKey) (string, error) {
 
 	headerBytes, err := json.Marshal(headers)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-
-	headerEncoded := base64.StdEncoding.EncodeToString(headerBytes)
 
 	claimsBytes, err := json.Marshal(claims)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
+	headerEncoded := base64.StdEncoding.EncodeToString(headerBytes)
 	claimsEncoded := base64.StdEncoding.EncodeToString(claimsBytes)
 
-	return fmt.Sprintf("%s.%s.", headerEncoded, claimsEncoded), nil
+	signature := ""
+	// If a key was provided let us add a signature to the key that can
+	// later be validated with the public key
+	if key != nil {
+
+		inputBytes := []byte(fmt.Sprintf("%s.%s", headerEncoded, claimsEncoded))
+		hash := sha256.New()
+		hash.Write(inputBytes)
+		inputHash := hash.Sum(nil)
+
+		signatureBytes, err := key.Sign(rand.Reader, inputHash, crypto.SHA256)
+		if err != nil {
+			return "", err
+		}
+		signature = base64.StdEncoding.EncodeToString(signatureBytes)
+	}
+
+	return fmt.Sprintf("%s.%s.%s", headerEncoded, claimsEncoded, signature), nil
 }
 
 type TokenConfig struct {
