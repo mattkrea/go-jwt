@@ -47,7 +47,7 @@ config := &jwt.TokenConfig{
 	Issuer: "My Company",
 	Subject: "Leeroy Jenkins",
 	Audience: "Sales Agent",
-	// Must wait 30 minutes before the token is consideredvlvdb
+	// Must wait 30 minutes before the token is considered valid
 	NotBefore: int32(time.Now().Unix()) + (30 * 60)
 	Expiration: int32(time.Now().Unix()) + (12 * 60 * 60),
 }
