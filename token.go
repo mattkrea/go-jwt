@@ -18,10 +18,15 @@ type Token struct {
 	Payload map[string]interface{}
 }
 
+// New allows you to create a token based upon the configuration
+// you provide.
 func New(c *TokenConfig) *Token {
 	return &Token{Config: c, Payload: make(map[string]interface{})}
 }
 
+// Set is a convenience method for setting properties within the
+// custom claim `payload`. This is where you may store some values
+// such as permissions or other metadata
 func (t *Token) Set(key string, value interface{}) {
 	t.Payload[key] = value
 }
@@ -39,7 +44,8 @@ func (t *Token) String(key *rsa.PrivateKey) (string, error) {
 	claims := make(map[string]interface{})
 
 	// Run through the provided configuration and add
-	// whatever properties have been provided
+	// whatever properties have been provided. Most of these
+	// are *optional* according to the RFC.
 	if t.Config.Issuer != "" {
 		claims["iss"] = t.Config.Issuer
 	}
@@ -162,9 +168,10 @@ type TokenConfig struct {
 	IssuedAt   int32
 }
 
+// DefaultConfig provides a minimal working claims setup
+// with a 12-hour token expiration
 func DefaultConfig() *TokenConfig {
 	return &TokenConfig{
-		// Default to 12 hour expiration
 		Expiration: int32(time.Now().Unix()) + (12 * 60 * 60),
 	}
 }
