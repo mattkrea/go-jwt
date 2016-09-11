@@ -95,13 +95,8 @@ func (t *Token) String(key *rsa.PrivateKey) (string, error) {
 	// If a key was provided let us add a signature to the key that can
 	// later be validated with the public key
 	if key != nil {
-
-		inputBytes := []byte(fmt.Sprintf("%s.%s", headerEncoded, claimsEncoded))
-		hash := sha256.New()
-		hash.Write(inputBytes)
-		inputHash := hash.Sum(nil)
-
-		signatureBytes, err := key.Sign(rand.Reader, inputHash, crypto.SHA256)
+		inputHash := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", headerEncoded, claimsEncoded)))
+		signatureBytes, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, inputHash[:])
 		if err != nil {
 			return "", err
 		}
@@ -122,12 +117,9 @@ func Parse(token string, key *rsa.PublicKey) (*Token, error) {
 	parts := strings.Split(token, ".")
 
 	if key != nil {
-		inputBytes := []byte(fmt.Sprintf("%s.%s", parts[0], parts[1]))
-		hash := sha256.New()
-		hash.Write(inputBytes)
-		inputHash := hash.Sum(nil)
-
-		err := rsa.VerifyPKCS1v15(key, crypto.SHA256, inputHash, []byte(parts[2]))
+		inputHash := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", parts[0], parts[1])))
+		signature, _ := base64.StdEncoding.DecodeString(parts[2])
+		err := rsa.VerifyPKCS1v15(key, crypto.SHA256, inputHash[:], signature)
 		if err != nil {
 			return nil, errors.New("token signature verification failed")
 		}
@@ -156,7 +148,16 @@ func Parse(token string, key *rsa.PublicKey) (*Token, error) {
 		return nil, errors.New("token contains invalid JSON")
 	}
 
-	return &Token{Payload: claims["payload"].(map[string]interface{})}, nil
+	if claims["exp"] != nil {
+		// Hack around Unix epoch being unmarshaled as a float
+		claims["exp"] = int32(claims["exp"].(float64))
+		if claims["exp"].(int32) < int32(time.Now().Unix()) {
+			return nil, errors.New("token has expired")
+		}
+	}
+
+	output := &Token{Payload: claims["payload"].(map[string]interface{})}
+	return output, nil
 }
 
 type TokenConfig struct {

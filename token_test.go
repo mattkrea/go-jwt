@@ -53,14 +53,30 @@ func TestParse(t *testing.T) {
 	assert.Equal(t, nil, err, "should properly decode token")
 }
 
+func TestParseExpired(t *testing.T) {
+	token := New(&TokenConfig{Expiration: int32(time.Now().Unix()) - (1 * 60 * 60)})
+	token.Set("name", "Test")
+	output, _ := token.String(nil)
+	_, err := Parse(output, nil)
+	assert.NotEqual(t, nil, err, "err should exist")
+	assert.Equal(t, "token has expired", err.Error(), "should reject expired token")
+}
+
 func TestSignedString(t *testing.T) {
-
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-
 	token := New(DefaultConfig())
 	token.Set("name", "Test")
 	output, err := token.String(key)
 	assert.Equal(t, nil, err, "should properly encode token")
 	assert.Equal(t, 2, strings.Count(output, "."))
 	assert.NotEqual(t, ".", output[len(output)-1:], "should add signature after final period")
+}
+
+func TestSignedParse(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	token := New(DefaultConfig())
+	token.Set("name", "Test")
+	output, _ := token.String(key)
+	_, err := Parse(output, &key.PublicKey)
+	assert.Equal(t, nil, err, "err should not exist")
 }
